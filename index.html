@@ -1,0 +1,313 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0d1117; --card-bg: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --orange: #d2991d; --red: #f85149; --purple: #a371f7;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+  h1 { font-size: 1.5rem; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .refresh-badge { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--muted); }
+  .refresh-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; transition: border-color 0.2s; }
+  .card:hover { border-color: var(--accent); }
+  .card-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.5rem; }
+  .card-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+  .accent { color: var(--accent); } .green { color: var(--green); } .orange { color: var(--orange); } .red { color: var(--red); } .purple { color: var(--purple); }
+  .card-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+  .chart-section { margin-bottom: 2rem; }
+  .chart-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .chart-card h3 { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; font-weight: 500; }
+  .chart-wrap { position: relative; width: 100%; height: 300px; }
+  canvas { width: 100% !important; height: 100% !important; }
+
+  .status { margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); text-align: center; }
+  .status.error { color: var(--red); }
+  .footer { margin-top: 2rem; text-align: center; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 1.5rem; }
+
+  /* 设置弹窗 */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 420px; max-width: 90vw; }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 1rem; font-weight: 600; }
+  .modal p { color: var(--muted); font-size: 0.82rem; margin-bottom: 0.75rem; line-height: 1.5; }
+  .modal a { color: var(--accent); }
+  .modal label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .modal input { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 0.75rem; margin-top: 1.25rem; justify-content: flex-end; }
+  .btn-primary { background: var(--accent); color: #fff; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; }
+  .btn-ghost:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- API Key 设置弹窗 -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ 设置 API Key</h2>
+    <p>在 <a href="https://platform.deepseek.com/api_keys" target="_blank">platform.deepseek.com/api_keys</a> 创建并复制你的 API Key。</p>
+    <p style="color:var(--muted);font-size:0.72rem;">Key 仅存储在浏览器本地，不会上传到任何服务器。</p>
+    <label>DeepSeek API Key</label>
+    <input type="password" id="apiKeyInput" placeholder="sk-...">
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="clearKey()">清除并退出</button>
+      <button class="btn-primary" onclick="saveKey()">保存</button>
+    </div>
+    <p id="modalError" style="color:var(--red);font-size:0.75rem;margin-top:0.5rem;display:none;"></p>
+  </div>
+</div>
+
+<div class="container">
+  <header>
+    <h1>🤖 DeepSeek Dashboard</h1>
+    <div class="header-right">
+      <div class="refresh-badge">
+        <span class="dot"></span>
+        <span id="lastRefresh">--</span>
+        <span>· 每60秒</span>
+      </div>
+      <button class="btn" onclick="showSettings()" title="修改 API Key">⚙️</button>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">💰 账户余额</div>
+      <div class="card-value accent" id="totalBalance">--</div>
+      <div class="card-sub">CNY</div>
+    </div>
+    <div class="card">
+      <div class="card-label">📉 本月消费</div>
+      <div class="card-value red" id="monthConsume">--</div>
+      <div class="card-sub">本月累计消耗</div>
+    </div>
+    <div class="card">
+      <div class="card-label">🔥 本日消耗</div>
+      <div class="card-value orange" id="todayConsume">--</div>
+      <div class="card-sub">今日消耗</div>
+    </div>
+    <div class="card">
+      <div class="card-label">📊 日均消耗</div>
+      <div class="card-value purple" id="avgDaily">--</div>
+      <div class="card-sub" id="avgDailySub">本月日均</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-card">
+      <h3>📈 每日消耗趋势 (本月)</h3>
+      <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="status" id="status">正在获取数据...</div>
+  <div class="footer">
+    DeepSeek API · 每分钟自动刷新 · 数据存储在浏览器本地
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://api.deepseek.com/user/balance';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+let dailyChart = null;
+let refreshTimer = null;
+
+// ===== Key 管理 =====
+function getKey() {
+  return localStorage.getItem('ds_api_key') || '';
+}
+
+function saveKey() {
+  const input = document.getElementById('apiKeyInput');
+  const key = input.value.trim();
+  const errEl = document.getElementById('modalError');
+  if (!key || !key.startsWith('sk-')) {
+    errEl.textContent = '请输入有效的 API Key（以 sk- 开头）';
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('ds_api_key', key);
+  document.getElementById('settingsModal').classList.remove('active');
+  doRefresh();
+}
+
+function clearKey() {
+  localStorage.removeItem('ds_api_key');
+  document.getElementById('settingsModal').classList.remove('active');
+}
+
+function showSettings() {
+  document.getElementById('apiKeyInput').value = getKey();
+  document.getElementById('modalError').style.display = 'none';
+  document.getElementById('settingsModal').classList.add('active');
+}
+
+// ===== 数据处理 =====
+function getMonthStart() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function getTodayStr() {
+  const d = new Date();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem('ds_history');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveSnapshot(balance) {
+  const history = loadHistory();
+  const now = new Date();
+  const entry = { time: now.toISOString(), balance, date: now.toISOString().split('T')[0] };
+  const last = history[history.length - 1];
+  if (last && (now - new Date(last.time)) < 58000) return history;
+  history.push(entry);
+  const cutoff = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+  const trimmed = history.filter(e => new Date(e.time).getTime() > cutoff);
+  localStorage.setItem('ds_history', JSON.stringify(trimmed));
+  return trimmed;
+}
+
+function computeMetrics(history, currentBalance) {
+  const monthStart = getMonthStart().getTime();
+  const todayStr = getTodayStr();
+  const monthRecords = [];
+  const todayRecords = [];
+  for (const e of history) {
+    if (new Date(e.time).getTime() >= monthStart) {
+      monthRecords.push(e);
+      if (e.date === todayStr) todayRecords.push(e);
+    }
+  }
+  let monthConsume = 0, todayConsume = 0;
+  if (monthRecords.length > 0) monthConsume = Math.max(0, monthRecords[0].balance - currentBalance);
+  if (todayRecords.length > 0) todayConsume = Math.max(0, todayRecords[0].balance - currentBalance);
+  const daysInMonth = new Date().getDate();
+  const avgDaily = daysInMonth > 0 ? monthConsume / daysInMonth : 0;
+
+  const dailyMap = {};
+  for (const r of monthRecords) {
+    if (!dailyMap[r.date]) dailyMap[r.date] = { first: r.balance, last: r.balance };
+    if (r.balance > dailyMap[r.date].first) dailyMap[r.date].first = r.balance;
+    if (r.balance < dailyMap[r.date].last) dailyMap[r.date].last = r.balance;
+  }
+  const dailyData = Object.keys(dailyMap).sort().map(d => ({
+    date: d, consume: Math.max(0, dailyMap[d].first - dailyMap[d].last)
+  }));
+  return { monthConsume, todayConsume, avgDaily, dailyData, daysInMonth };
+}
+
+// ===== 图表 =====
+function initChart() {
+  const ctx = document.getElementById('dailyChart').getContext('2d');
+  dailyChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: '日消耗 (CNY)', data: [], backgroundColor: 'rgba(88,166,255,0.5)', borderColor: '#58a6ff', borderWidth: 1, borderRadius: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `消耗: ¥${ctx.raw.toFixed(4)}` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: 'rgba(48,54,61,0.5)' }, ticks: { font: { size: 11 }, callback: v => '¥' + v.toFixed(2) } }
+      }
+    }
+  });
+}
+
+function updateChart(dailyData) {
+  if (!dailyChart) return;
+  dailyChart.data.labels = dailyData.map(d => d.date.slice(5));
+  dailyChart.data.datasets[0].data = dailyData.map(d => d.consume);
+  dailyChart.update();
+}
+
+// ===== 主流程 =====
+async function doRefresh() {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = '正在刷新...';
+  statusEl.className = 'status';
+
+  const key = getKey();
+  if (!key) {
+    statusEl.textContent = '请先设置 API Key';
+    statusEl.className = 'status error';
+    document.getElementById('settingsModal').classList.add('active');
+    return;
+  }
+
+  try {
+    const resp = await fetch(API_URL, {
+      headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    const data = await resp.json();
+
+    let balance = 0;
+    for (const info of (data.balance_infos || [])) {
+      balance += parseFloat(info.topped_up_balance || 0);
+    }
+
+    const history = saveSnapshot(balance);
+    const m = computeMetrics(history, balance);
+
+    document.getElementById('totalBalance').textContent = `¥${balance.toFixed(3)}`;
+    document.getElementById('monthConsume').textContent = `¥${m.monthConsume.toFixed(3)}`;
+    document.getElementById('todayConsume').textContent = `¥${m.todayConsume.toFixed(3)}`;
+    document.getElementById('avgDaily').textContent = `¥${m.avgDaily.toFixed(3)}`;
+    document.getElementById('avgDailySub').textContent = `本月第 ${m.daysInMonth} 天`;
+
+    updateChart(m.dailyData);
+
+    const now = new Date();
+    document.getElementById('lastRefresh').textContent =
+      `上次刷新: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    statusEl.textContent = '✓ 数据已更新';
+  } catch (err) {
+    statusEl.textContent = `✗ ${err.message}`;
+    statusEl.className = 'status error';
+  }
+}
+
+// ===== 启动 =====
+initChart();
+const key = getKey();
+if (key) {
+  doRefresh();
+} else {
+  document.getElementById('status').textContent = '请设置 API Key';
+  document.getElementById('status').className = 'status error';
+  document.getElementById('settingsModal').classList.add('active');
+}
+refreshTimer = setInterval(doRefresh, 60000);
+</script>
+</body>
+</html>

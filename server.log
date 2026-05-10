@@ -1,0 +1,12 @@
+INFO:     127.0.0.1:7450 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7461 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7470 - "GET /api/balance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1820 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1820 - "GET /api/balance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:1820 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:10341 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10341 - "GET /api/balance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5321 - "GET /api/balance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11209 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5628 - "GET / HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:5628 - "GET /api/balance HTTP/1.1" 200 OK
